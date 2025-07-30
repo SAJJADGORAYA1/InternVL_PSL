@@ -39,6 +39,14 @@ class InternVLChatConfig(PretrainedConfig):
             max_dynamic_patch=6,
             **kwargs):
         super().__init__(**kwargs)
+        print("[DEBUG] RAW kwargs keys:", kwargs.keys())
+        print("[DEBUG] Got llm_config:", llm_config)
+
+        # Handle Hugging Face's second internal config init with no args
+        if llm_config is None:
+            print("[INFO] Detected internal config diff call (llm_config=None). Using dummy config.")
+            llm_config = {'architectures': ['Dummy']}
+        print("[DEBUG] Got llm_config now:", llm_config)
 
         if vision_config is None:
             vision_config = {'architectures': ['InternVisionModel']}
@@ -57,9 +65,14 @@ class InternVLChatConfig(PretrainedConfig):
         elif llm_config['architectures'][0] == 'Phi3ForCausalLM':
             self.llm_config = Phi3Config(**llm_config)
         elif llm_config['architectures'][0] == 'Qwen2ForCausalLM':
+            print(("EVERYTHING GOOD SO FARRR"))
             self.llm_config = Qwen2Config(**llm_config)
+        elif llm_config['architectures'][0] == 'Dummy':
+            print("We good for real")
+            self.llm_config = PretrainedConfig()
         else:
             raise ValueError('Unsupported architecture: {}'.format(llm_config['architectures'][0]))
+        print("Ok now we out")
         self.use_backbone_lora = use_backbone_lora
         self.use_llm_lora = use_llm_lora
         self.pad2square = pad2square
@@ -72,13 +85,20 @@ class InternVLChatConfig(PretrainedConfig):
         self.ps_version = ps_version  # pixel shuffle version
         self.min_dynamic_patch = min_dynamic_patch
         self.max_dynamic_patch = max_dynamic_patch
+        print("still good")
 
-        self.hidden_size = self.llm_config.hidden_size
+        if hasattr(self.llm_config, 'hidden_size'):
+            self.hidden_size = self.llm_config.hidden_size
+        else:
+            print("[INFO] Using dummy config — skipping hidden_size")
+            self.hidden_size = None  # Or a default if needed
         # By default, we use tie_word_embeddings=False for models of all sizes.
         self.tie_word_embeddings = False
         self.llm_config.tie_word_embeddings = self.tie_word_embeddings
+        print("aight we good")
 
         logger.info(f'vision_select_layer: {self.select_layer}')
+        print("wait was this  the problem?")
         logger.info(f'ps_version: {self.ps_version}')
         logger.info(f'min_dynamic_patch: {self.min_dynamic_patch}')
         logger.info(f'max_dynamic_patch: {self.max_dynamic_patch}')

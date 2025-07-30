@@ -32,13 +32,14 @@ from internvl.model.internvl_chat import (InternVisionConfig,
                                           InternVisionModel,
                                           InternVLChatConfig,
                                           InternVLChatModel)
-from internvl.patch import (concat_pad_data_collator,
-                            replace_internlm2_attention_class,
-                            replace_llama_attention_class,
-                            replace_llama_rmsnorm_with_fused_rmsnorm,
-                            replace_phi3_attention_class,
-                            replace_qwen2_attention_class,
-                            replace_train_dataloader, replace_train_sampler)
+from internvl.patch import concat_pad_data_collator
+# from internvl.patch import (concat_pad_data_collator,
+#                             replace_internlm2_attention_class,
+#                             replace_llama_attention_class,
+#                             replace_llama_rmsnorm_with_fused_rmsnorm,
+#                             replace_phi3_attention_class,
+#                             replace_qwen2_attention_class,
+#                             replace_train_dataloader, replace_train_sampler)
 from internvl.train.constants import (BOX_END_TOKEN, BOX_START_TOKEN,
                                       IMG_CONTEXT_TOKEN, IMG_END_TOKEN,
                                       IMG_START_TOKEN, QUAD_END_TOKEN,
@@ -796,14 +797,7 @@ def len2weight(x, loss_reduction):
 
 
 def main():
-    # Apply necessary patches for the transformers library
-    replace_llama_rmsnorm_with_fused_rmsnorm()
-    replace_train_sampler()
-    replace_train_dataloader()
 
-    # Parse input arguments
-    # See all possible arguments in src/transformers/training_args.py
-    # If use DeepSpeed zero3, init_dist must before HfArgumentParser
     launcher = os.environ.get('LAUNCHER', 'slurm')
     init_dist(launcher=launcher, backend='nccl')
     parser = HfArgumentParser((ModelArguments, DataTrainingArguments, TrainingArguments))
@@ -815,10 +809,6 @@ def main():
         model_args, data_args, training_args = parser.parse_args_into_dataclasses()
 
     training_args.use_packed_ds = data_args.use_packed_ds
-
-    # Sending telemetry. Tracking the example usage helps us better allocate resources to maintain them. The
-    # information sent is the one passed as arguments along with your Python/PyTorch versions.
-    # send_example_telemetry('InternV-Chat', model_args, data_args)
 
     # Setup logging
     logging.basicConfig(
@@ -874,20 +864,6 @@ def main():
     num_new_tokens = tokenizer.add_tokens(token_list, special_tokens=True)
     img_context_token_id = tokenizer.convert_tokens_to_ids(IMG_CONTEXT_TOKEN)
     tcs_loader = TCSLoader('~/petreloss.conf') if has_tcs_loader else None
-
-    if data_args.use_packed_ds:
-        replace_internlm2_attention_class()
-        replace_qwen2_attention_class()
-        replace_phi3_attention_class()
-        replace_llama_attention_class()
-
-    if model_args.use_liger:
-        from internvl.patch import apply_liger_kernel_to_internvit
-        from liger_kernel.transformers import (apply_liger_kernel_to_llama,
-                                               apply_liger_kernel_to_qwen2)
-        apply_liger_kernel_to_llama()
-        apply_liger_kernel_to_qwen2()
-        # apply_liger_kernel_to_internvit()
 
     if model_args.model_name_or_path is not None:
         logger.info('Loading InternVLChatModel...')
